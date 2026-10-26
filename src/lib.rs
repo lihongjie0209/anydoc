@@ -38,6 +38,8 @@ pub enum Format {
     ///
     /// [pdf-inspector]: https://github.com/firecrawl/pdf-inspector
     Pdf,
+    /// Open Fixed-layout Document (`.ofd`). Text is extracted from page objects.
+    Ofd,
     /// Binary PowerPoint 97-2003 (`.ppt`, `.pps`, `.pot`).
     Ppt,
     /// PresentationML (`.pptx`, `.pptm`, `.ppsx`, `.ppsm`).
@@ -76,6 +78,7 @@ impl Format {
             "docx" | "docm" => Format::Docx,
             "odt" => Format::Odt,
             "pdf" => Format::Pdf,
+            "ofd" => Format::Ofd,
             "pptx" | "pptm" | "ppsx" | "ppsm" => Format::Pptx,
             "ppt" | "pps" | "pot" => Format::Ppt,
             "rtf" => Format::Rtf,

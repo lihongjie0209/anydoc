@@ -3,7 +3,7 @@
 
 const { readFile, writeFile } = require('node:fs/promises')
 
-const FORMATS = 'doc, docx, odt, pdf, ppt, pptx, rtf, epub, xlsx, ods, odp, csv'
+const FORMATS = 'doc, docx, odt, pdf, ofd, ppt, pptx, rtf, epub, xlsx, ods, odp, csv'
 
 const HELP = `anydoc: convert documents to GitHub-Flavored Markdown
 
@@ -44,7 +44,7 @@ Exit codes:
   0  success
   1  the document could not be read or converted
   2  usage error: unknown option, missing input, or invalid --format
-  3  pages of a PDF need OCR
+  3  PDF or OFD pages need OCR
 
 Examples:
   anydoc report.docx

@@ -67,6 +67,7 @@ test('format detection reads content, extension, and path', async () => {
   assert.equal(formatFromBytes(await readFile(CSV)), null)
   assert.equal(formatFromExtension('.pptm'), 'pptx')
   assert.equal(formatFromExtension('xls'), 'xlsx')
+  assert.equal(formatFromExtension('ofd'), 'ofd')
   assert.equal(formatFromPath('/tmp/report.odt'), 'odt')
   assert.equal(formatFromPath('/tmp/report.unknown'), null)
 })

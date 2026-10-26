@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![skills.sh](https://skills.sh/b/firecrawl/anydoc)](https://skills.sh/firecrawl/anydoc)
 
-Fast Rust library that converts documents (Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV, and PDF) into clean GitHub-Flavored Markdown. Includes bindings for [Node.js](node/README.md), [Python](python/README.md), and the [browser](wasm/README.md) (WebAssembly).
+Fast Rust library that converts documents (Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV, PDF, and OFD) into clean GitHub-Flavored Markdown. Includes bindings for [Node.js](node/README.md), [Python](python/README.md), and the [browser](wasm/README.md) (WebAssembly).
 
 Built by [Firecrawl](https://firecrawl.dev) to turn any office document into LLM-ready Markdown in single-digit milliseconds, with one consistent output no matter which format goes in. It powers [Firecrawl Parse](https://firecrawl.dev/parse), so if you'd rather not run it yourself, the hosted API gives you the same conversion plus our OCR models for the scanned pages anydoc can't read on its own.
 
@@ -168,6 +168,9 @@ Only documents that need OCR leave the machine, and the whole document goes, sin
 | EPUB             | `.epub`                                                    |
 | CSV              | `.csv`                                                     |
 | PDF              | `.pdf`                                                     |
+| OFD              | `.ofd` (text objects)                                    |
+
+OFD conversion preserves outline headings, large-font headings, bold and italic text, URI links, printed lists, and complete bordered table grids. Tables and large-font headings are inferred from fixed-page geometry; pages without those cues remain paragraphs. Image-only pages return `NeedsOcr`; images, vector drawings, and non-link annotations are not included in Markdown.
 
 ## Benchmark
 
@@ -242,7 +245,7 @@ match anydoc::to_markdown(path) {
 | Variant         | Meaning                                                             |
 | --------------- | ------------------------------------------------------------------- |
 | `Unsupported`   | Unknown format, or one that cannot be converted                     |
-| `NeedsOcr`      | Scanned or image-only pages of a PDF, listed in `pages`             |
+| `NeedsOcr`      | Scanned or image-only PDF/OFD pages, listed in `pages`             |
 | `Malformed`     | Structurally unusable: no meaningful content could be extracted     |
 | `Encrypted`     | Encrypted or password-protected                                     |
 | `ResourceLimit` | Crossed a fixed safety limit (decompression, nesting, node count)   |

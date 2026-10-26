@@ -107,6 +107,7 @@ class AnydocTest(unittest.TestCase):
         self.assertIsNone(anydoc.format_from_bytes(CSV.read_bytes()))
         self.assertEqual(anydoc.format_from_extension(".pptm"), "pptx")
         self.assertEqual(anydoc.format_from_extension("xls"), "xlsx")
+        self.assertEqual(anydoc.format_from_extension("ofd"), "ofd")
         self.assertEqual(anydoc.format_from_path("report.odt"), "odt")
         self.assertIsNone(anydoc.format_from_path("report.unknown"))
 
