@@ -85,7 +85,7 @@ def to_markdown(
             raise
         path = Path(path)
         data = path.read_bytes()
-        if format_from_bytes(data) != "pdf":
+        if (format_from_bytes(data) or format_from_path(path)) != "pdf":
             raise
     return _parse_hosted(data, path.name, parse_mode, api_key, api_url)
 

@@ -1,7 +1,7 @@
 // Smoke test: the bindings load and every entry point round-trips a fixture.
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -162,6 +162,26 @@ test("ocr: 'hosted' leaves image-only OFD as needsOcr", async () => {
     }
     assert.deepEqual(hits, [])
   })
+})
+
+test('hosted fallback uses file content before a misleading extension', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'anydoc-hosted-'))
+  try {
+    const ofdNamedPdf = join(dir, 'scan.pdf')
+    const pdfNamedOfd = join(dir, 'scan.ofd')
+    await Promise.all([
+      writeFile(ofdNamedPdf, await readFile(SCANNED_OFD)),
+      writeFile(pdfNamedOfd, await readFile(MIXED)),
+    ])
+    await withHostedStub(HOSTED, async (hits) => {
+      await assert.rejects(toMarkdown(ofdNamedPdf, { ocr: 'hosted' }), (error) => error.code === 'needsOcr')
+      assert.deepEqual(hits, [])
+      assert.equal(await toMarkdown(pdfNamedOfd, { ocr: 'hosted' }), HOSTED.body.data.markdown)
+      assert.deepEqual(hits, [['/v2/parse', true]])
+    })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test("parseMode picks the Parse pdf mode, 'auto' by default", async () => {

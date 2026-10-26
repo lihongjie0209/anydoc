@@ -4,6 +4,7 @@ import ast
 import io
 import json
 import os
+import tempfile
 import threading
 import unittest
 import zipfile
@@ -162,6 +163,20 @@ class AnydocTest(unittest.TestCase):
                 with self.assertRaises(anydoc.NeedsOcrError):
                     convert()
             self.assertEqual(hits, [])
+
+    def test_hosted_fallback_uses_content_before_a_misleading_extension(self):
+        reply = {"success": True, "data": {"markdown": HOSTED_MARKDOWN}}
+        with tempfile.TemporaryDirectory() as directory:
+            ofd_named_pdf = Path(directory) / "scan.pdf"
+            pdf_named_ofd = Path(directory) / "scan.ofd"
+            ofd_named_pdf.write_bytes(SCANNED_OFD.read_bytes())
+            pdf_named_ofd.write_bytes(MIXED.read_bytes())
+            with hosted_stub(200, reply) as hits:
+                with self.assertRaises(anydoc.NeedsOcrError):
+                    anydoc.to_markdown(ofd_named_pdf, ocr="hosted")
+                self.assertEqual(hits, [])
+                self.assertEqual(anydoc.to_markdown(pdf_named_ofd, ocr="hosted"), HOSTED_MARKDOWN)
+                self.assertEqual(hits, [("/v2/parse", True)])
 
     def test_parse_mode_picks_the_parse_pdf_mode_auto_by_default(self):
         reply = {"success": True, "data": {"markdown": HOSTED_MARKDOWN}}

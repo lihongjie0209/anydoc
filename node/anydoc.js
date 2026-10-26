@@ -23,7 +23,7 @@ async function toMarkdown(path, options) {
   } catch (error) {
     if (!sendsToHosted(error, options)) throw error
     const bytes = await readFile(path)
-    if (native.formatFromBytes(bytes) !== 'pdf') throw error
+    if ((native.formatFromBytes(bytes) ?? native.formatFromPath(path)) !== 'pdf') throw error
     return parseHosted(bytes, basename(path), options)
   }
 }
