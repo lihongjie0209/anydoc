@@ -20,6 +20,7 @@ CSV = FIXTURES / "csv" / "sheet.csv"
 ENCRYPTED = FIXTURES / "malformed" / "encrypted--errors.odt"
 ZIPBOMB = FIXTURES / "abuse" / "zipbomb--errors.docx"
 MIXED = FIXTURES / "pdf" / "handmade-mixed.pdf"
+SCANNED_OFD = FIXTURES / "ofd" / "image-only.ofd"
 
 HOSTED_MARKDOWN = "# Read by the hosted parser\n"
 
@@ -149,6 +150,18 @@ class AnydocTest(unittest.TestCase):
             self.assertEqual(hits, [("/v2/parse", True)])
             self.assertRegex(anydoc.to_markdown(OUTLINE, ocr="hosted"), r"(?m)^# ")
             self.assertEqual(hits, [("/v2/parse", True)])
+
+    def test_ocr_hosted_keeps_image_only_ofd_as_needs_ocr(self):
+        reply = {"success": True, "data": {"markdown": HOSTED_MARKDOWN}}
+        with hosted_stub(200, reply) as hits:
+            for convert in (
+                lambda: anydoc.to_markdown(SCANNED_OFD, ocr="hosted"),
+                lambda: anydoc.to_markdown_bytes(SCANNED_OFD.read_bytes(), "ofd", ocr="hosted"),
+                lambda: anydoc.to_markdown_bytes(SCANNED_OFD.read_bytes(), ocr="hosted"),
+            ):
+                with self.assertRaises(anydoc.NeedsOcrError):
+                    convert()
+            self.assertEqual(hits, [])
 
     def test_parse_mode_picks_the_parse_pdf_mode_auto_by_default(self):
         reply = {"success": True, "data": {"markdown": HOSTED_MARKDOWN}}

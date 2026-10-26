@@ -60,7 +60,7 @@ const document = await toDocument(bytes);
 
 ## Scanned pages
 
-anydoc converts locally and does not do OCR, so a PDF with scanned or image-only pages rejects with `needsOcr`. Opt in with `ocr: 'hosted'` to send that document to [Firecrawl Parse](https://firecrawl.dev/parse). No signup needed. Set `apiKey` or `FIRECRAWL_API_KEY` for higher limits.
+anydoc converts locally and does not do OCR, so a PDF or OFD with scanned or image-only pages rejects with `needsOcr`. For PDFs, opt in with `ocr: 'hosted'` to send that document to [Firecrawl Parse](https://firecrawl.dev/parse). This hosted PDF parser does not accept OFD; OFD pages still reject with `needsOcr` even when hosted OCR is requested. No signup needed. Set `apiKey` or `FIRECRAWL_API_KEY` for higher limits.
 
 ```js
 const markdown = await toMarkdown('scan.pdf', { ocr: 'hosted' });

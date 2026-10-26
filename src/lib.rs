@@ -63,7 +63,8 @@ pub enum Format {
 impl Format {
     /// Detect the format from the content itself: the signature and identity
     /// each container specification designates (PDF header, RTF open group,
-    /// OLE stream names, ZIP package mimetype/content types). Plain-text
+    /// OLE stream names, ZIP package mimetype/content types, OFD.xml or
+    /// Encryptions.xml descriptors). Plain-text
     /// formats (CSV) carry no signature and return `None`; so does anything
     /// unrecognized.
     pub fn from_bytes(bytes: &[u8]) -> Option<Format> {

@@ -94,23 +94,29 @@ pub fn parse(bytes: &[u8]) -> Result<Document, ConvertError> {
             } else {
                 Vec::new()
             };
+            let mut template_stats = ContentStats::default();
             for template in page_xml.find_all(OFD, "Template") {
                 if template.attr_any("ZOrder") != Some("Foreground") {
-                    append_template(&mut pkg, &templates, &root_path, template, &mut doc)?;
+                    template_stats.merge(append_template(
+                        &mut pkg, &templates, &root_path, template, &mut doc,
+                    )?);
                 }
             }
+            let mut page_stats = ContentStats::default();
             if let Some(content) = page_xml.find(OFD, "Content") {
-                if content.descendants(OFD, "ImageObject").next().is_some()
-                    && content.descendants(OFD, "TextObject").next().is_none()
-                {
-                    ocr_pages.push(page_count);
-                }
-                append_content(content, &page_path, &mut doc, &mut headings, &links)?;
+                page_stats = append_content(content, &page_path, &mut doc, &mut headings, &links)?;
             }
             for template in page_xml.find_all(OFD, "Template") {
                 if template.attr_any("ZOrder") == Some("Foreground") {
-                    append_template(&mut pkg, &templates, &root_path, template, &mut doc)?;
+                    template_stats.merge(append_template(
+                        &mut pkg, &templates, &root_path, template, &mut doc,
+                    )?);
                 }
+            }
+            if (page_stats.image && !page_stats.text)
+                || (template_stats.image && !template_stats.text && !page_stats.text)
+            {
+                ocr_pages.push(page_count);
             }
         }
     }
@@ -129,9 +135,9 @@ fn append_template(
     document_path: &str,
     template: &Element,
     doc: &mut Document,
-) -> Result<(), ConvertError> {
+) -> Result<ContentStats, ConvertError> {
     let Some(loc) = template.attr_any("TemplateID").and_then(|id| templates.get(id)) else {
-        return Ok(());
+        return Ok(ContentStats::default());
     };
     let template_path = resolve(document_path, loc)?;
     let tree = pkg.required_xml_part(&template_path)?;
@@ -142,9 +148,22 @@ fn append_template(
         return Err(ConvertError::malformed_part(&template_path, "expected Page root element"));
     }
     if let Some(content) = page.find(OFD, "Content") {
-        append_content(content, &template_path, doc, &mut Vec::new(), &[])?;
+        return append_content(content, &template_path, doc, &mut Vec::new(), &[]);
     }
-    Ok(())
+    Ok(ContentStats::default())
+}
+
+#[derive(Default)]
+struct ContentStats {
+    image: bool,
+    text: bool,
+}
+
+impl ContentStats {
+    fn merge(&mut self, other: Self) {
+        self.image |= other.image;
+        self.text |= other.text;
+    }
 }
 
 fn read_links(pkg: &mut Package<'_>, part: &str) -> Result<Vec<(Bounds, String)>, ConvertError> {
@@ -233,9 +252,13 @@ fn append_content(
     doc: &mut Document,
     headings: &mut Vec<(String, u8)>,
     links: &[(Bounds, String)],
-) -> Result<(), ConvertError> {
+) -> Result<ContentStats, ConvertError> {
     let start = doc.blocks.len();
     let mut objects = Vec::new();
+    let mut stats = ContentStats {
+        image: content.descendants(OFD, "ImageObject").next().is_some(),
+        text: false,
+    };
     for object in content.descendants(OFD, "TextObject") {
         let mut text = String::new();
         for code in object.find_all(OFD, "TextCode") {
@@ -244,6 +267,7 @@ fn append_content(
         if text.trim().is_empty() {
             continue;
         }
+        stats.text = true;
         let weight = object.attr_any("Weight").and_then(|v| v.parse::<u16>().ok()).unwrap_or(400);
         let style = Style {
             bold: weight >= 600,
@@ -328,7 +352,7 @@ fn append_content(
         }
     }
     fold_lists(&mut doc.blocks, start);
-    Ok(())
+    Ok(stats)
 }
 
 fn rectangle_border(path: &Element) -> Option<Bounds> {
@@ -518,6 +542,7 @@ fn detect_table(
     let mut builder = GridBuilder::new();
     let mut used = Vec::new();
     let mut first_row_bold = true;
+    let mut first_row_has_text = false;
     let mut later_bold = false;
     for row in 0..rows {
         builder.next_row();
@@ -531,6 +556,7 @@ fn detect_table(
                     content.push(text_inline(object));
                     used.push(index);
                     if row == 0 {
+                        first_row_has_text = true;
                         first_row_bold &= object.style.bold;
                     } else {
                         later_bold |= object.style.bold;
@@ -546,7 +572,10 @@ fn detect_table(
         return Ok(None);
     }
     let mut table = builder.finish(TableKind::Data);
-    table.header_rows = resolve_header_rows(&table, usize::from(first_row_bold && !later_bold));
+    table.header_rows = resolve_header_rows(
+        &table,
+        usize::from(first_row_has_text && first_row_bold && !later_bold),
+    );
     Ok(Some((table, used)))
 }
 
@@ -826,5 +855,76 @@ mod tests {
         assert!(
             matches!(parse(&bytes), Err(ConvertError::NeedsOcr { pages, page_count }) if pages == [1] && page_count == 1)
         );
+    }
+
+    #[test]
+    fn empty_text_object_does_not_hide_image_page() {
+        let bytes = package(&[
+            (
+                "OFD.xml",
+                r#"<OFD xmlns="http://www.ofdspec.org/2016"><DocBody><DocRoot>Doc/Document.xml</DocRoot></DocBody></OFD>"#,
+            ),
+            (
+                "Doc/Document.xml",
+                r#"<Document xmlns="http://www.ofdspec.org/2016"><Pages><Page BaseLoc="Page.xml"/></Pages></Document>"#,
+            ),
+            (
+                "Doc/Page.xml",
+                r#"<Page xmlns="http://www.ofdspec.org/2016"><Content><Layer><ImageObject ResourceID="1"/><TextObject><TextCode>   </TextCode></TextObject></Layer></Content></Page>"#,
+            ),
+        ]);
+        assert!(
+            matches!(parse(&bytes), Err(ConvertError::NeedsOcr { pages, page_count }) if pages == [1] && page_count == 1)
+        );
+    }
+
+    #[test]
+    fn image_only_template_needs_ocr() {
+        let bytes = package(&[
+            (
+                "OFD.xml",
+                r#"<OFD xmlns="http://www.ofdspec.org/2016"><DocBody><DocRoot>Doc/Document.xml</DocRoot></DocBody></OFD>"#,
+            ),
+            (
+                "Doc/Document.xml",
+                r#"<Document xmlns="http://www.ofdspec.org/2016"><CommonData><TemplatePage ID="1" BaseLoc="Tpl.xml"/></CommonData><Pages><Page BaseLoc="Page.xml"/></Pages></Document>"#,
+            ),
+            (
+                "Doc/Page.xml",
+                r#"<Page xmlns="http://www.ofdspec.org/2016"><Template TemplateID="1" ZOrder="Background"/></Page>"#,
+            ),
+            (
+                "Doc/Tpl.xml",
+                r#"<Page xmlns="http://www.ofdspec.org/2016"><Content><Layer><ImageObject ResourceID="1"/></Layer></Content></Page>"#,
+            ),
+        ]);
+        assert!(
+            matches!(parse(&bytes), Err(ConvertError::NeedsOcr { pages, page_count }) if pages == [1] && page_count == 1)
+        );
+    }
+
+    #[test]
+    fn empty_first_row_is_not_a_table_header() {
+        let rects = (0..2)
+            .flat_map(|row| {
+                (0..2).map(move |col| Bounds {
+                    x: f64::from(col) * 40.0,
+                    y: f64::from(row) * 10.0,
+                    w: 40.0,
+                    h: 10.0,
+                })
+            })
+            .collect::<Vec<_>>();
+        let objects = (0..2)
+            .map(|col| TextObject {
+                text: format!("value {col}"),
+                style: Style::PLAIN,
+                size: None,
+                bounds: Some(Bounds { x: f64::from(col) * 40.0 + 2.0, y: 12.0, w: 30.0, h: 6.0 }),
+                link: None,
+            })
+            .collect::<Vec<_>>();
+        let (table, _) = detect_table(&rects, &objects).unwrap().unwrap();
+        assert_eq!(table.header_rows, 0);
     }
 }

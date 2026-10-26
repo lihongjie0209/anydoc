@@ -25,6 +25,7 @@ const RICH = fixture('docx/handmade-rich.docx')
 const CSV = fixture('csv/sheet.csv')
 const ENCRYPTED = fixture('malformed/encrypted--errors.odt')
 const MIXED = fixture('pdf/handmade-mixed.pdf')
+const SCANNED_OFD = fixture('ofd/image-only.ofd')
 
 test('toMarkdown detects the format from the file content', async () => {
   const markdown = await toMarkdown(OUTLINE)
@@ -150,6 +151,19 @@ test("ocr: 'hosted' sends a pdf with scanned pages to Firecrawl Parse, and nothi
   })
 })
 
+test("ocr: 'hosted' leaves image-only OFD as needsOcr", async () => {
+  await withHostedStub(HOSTED, async (hits) => {
+    for (const convert of [
+      () => toMarkdown(SCANNED_OFD, { ocr: 'hosted' }),
+      async () => toMarkdownBytes(await readFile(SCANNED_OFD), 'ofd', { ocr: 'hosted' }),
+      async () => toMarkdownBytes(await readFile(SCANNED_OFD), undefined, { ocr: 'hosted' }),
+    ]) {
+      await assert.rejects(convert(), (error) => error.code === 'needsOcr')
+    }
+    assert.deepEqual(hits, [])
+  })
+})
+
 test("parseMode picks the Parse pdf mode, 'auto' by default", async () => {
   await withHostedStub(HOSTED, async (hits, url, sent) => {
     await toMarkdown(MIXED, { ocr: 'hosted' })
@@ -239,6 +253,15 @@ test('cli --ocr hosted converts a pdf with scanned pages through Firecrawl Parse
     const { code, stdout } = await runCli([MIXED, '--ocr', 'hosted', '--api-url', url])
     assert.equal(code, undefined)
     assert.equal(stdout, HOSTED.body.data.markdown)
+  })
+})
+
+test('cli --ocr hosted keeps image-only OFD at needs OCR exit code', async () => {
+  await withHostedStub(HOSTED, async (hits, url) => {
+    const { code, stderr } = await runCli([SCANNED_OFD, '--ocr', 'hosted', '--api-url', url])
+    assert.equal(code, 3)
+    assert.match(stderr, /needs OCR/)
+    assert.deepEqual(hits, [])
   })
 })
 

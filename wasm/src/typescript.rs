@@ -32,7 +32,7 @@ export type ConvertErrorCode =
   /** A part required for any meaningful output is absent. */
   | 'missingPart'
 
-/** The error thrown for a PDF with pages that need OCR. */
+/** The error thrown for a PDF or OFD with pages that need OCR. */
 export interface NeedsOcrError extends Error {
   code: 'needsOcr'
   /** 1-indexed pages that need OCR. */

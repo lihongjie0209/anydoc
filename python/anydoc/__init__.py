@@ -46,10 +46,10 @@ variants that share a parser (`.docm`, `.xlsm`, `.ppsx`, ...) map onto these
 via `format_from_bytes` or `format_from_extension`."""
 
 Ocr = Literal["reject", "hosted"]
-"""What happens to a PDF whose pages need OCR. `reject` (the default) raises
-`NeedsOcrError` naming the pages. `hosted` sends the whole document to
-Firecrawl Parse instead, keyless unless a key is given. Documents anydoc
-converts itself never leave the machine."""
+"""What happens when PDF or OFD pages need OCR. `reject` (the default)
+raises `NeedsOcrError` naming the pages. `hosted` sends PDFs to Firecrawl
+Parse, keyless unless a key is given. OFD still raises `NeedsOcrError`.
+Documents anydoc converts itself never leave the machine."""
 
 ParseMode = Literal["auto", "fast", "ocr"]
 """Firecrawl Parse PDF mode for `ocr="hosted"`. `auto` (the default) extracts
@@ -83,8 +83,11 @@ def to_markdown(
     except NeedsOcrError:
         if ocr != "hosted":
             raise
-    path = Path(path)
-    return _parse_hosted(path.read_bytes(), path.name, parse_mode, api_key, api_url)
+        path = Path(path)
+        data = path.read_bytes()
+        if format_from_bytes(data) != "pdf":
+            raise
+    return _parse_hosted(data, path.name, parse_mode, api_key, api_url)
 
 
 def to_markdown_bytes(
@@ -104,7 +107,7 @@ def to_markdown_bytes(
     try:
         return _to_markdown_bytes(data, format)
     except NeedsOcrError:
-        if ocr != "hosted":
+        if ocr != "hosted" or (format or format_from_bytes(bytes(data))) != "pdf":
             raise
     return _parse_hosted(bytes(data), "document.pdf", parse_mode, api_key, api_url)
 

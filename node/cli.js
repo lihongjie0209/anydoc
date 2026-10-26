@@ -37,8 +37,8 @@ Options:
 The format is detected from the file content; the file extension is the
 fallback for signature-less formats (CSV). stdin has no extension, so CSV
 input from stdin needs --format csv. Scanned or image-only pages need OCR,
-which anydoc does not do: the document exits 3, or goes to Firecrawl Parse
-with --ocr hosted.
+which anydoc does not do: the document exits 3. PDF can go to Firecrawl
+Parse with --ocr hosted; OFD still exits 3.
 
 Exit codes:
   0  success
